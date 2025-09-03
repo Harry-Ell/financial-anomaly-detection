@@ -1,14 +1,43 @@
-# Anomaly Detection in Financial Time Series 
-This repository contains some of my code and additional results from section 4.2 of my dissertation, titled 'Real-Time Anomaly Detection in Multidimensional Financial Time Series' supervised by Idris Eckley and Florian Pein. 
+# Financial Anomaly Detection
 
-In this section, we postulate a mathematical form for the financial anomalies, and test this prediction on financial data as part of a backtest. This is done within my own, simplified backtesting engine. Here we can account for things such as latency and slippage, however a buy-sell spread is not factored in. 
+This repository contains supplementary code and results for Section 4.2 of the dissertation **"Real-Time Anomaly Detection in Multidimensional Financial Time Series"** supervised by Idris Eckley and Florian Pein.  
+The project investigates whether short lived anomalies (defined in this context as brief periods when residual returns across multiple assets move together in unexpected ways) can be detected in real time and traded profitably.
 
-Initial tests imply that the edge acquired is too small to be accessible given the spreads on many of the traded stocks
+## Goal
 
-## Repository Overview 
-- `alg_tools' Contains both the smoothing algorithm made use of, along with the script which allows us to interface R with python 
-- `algorithms' Contains two sets of trading algorithms, TradeLogic1 which is doing statistical arbitrage on correlated stocks, and TradeLogic2 which is doing mean reversion on trends inferred from principal components. 
-- `backtesting' Contains the class for orchestrating a backtest, a file which optimises parameters via bayesian optimisation and a notebook which calls the algorithm and investigates the results. 
+To define a practical notion of “anomaly” in financial time series, detect such events as they occur, and evaluate whether they provide a tradable edge after accounting for latency and slippage.
 
-## Mathematical Model
- 
+## Approach
+
+1. **Modeling:** Asset log prices are treated as having a latent mean and noise component. An anomaly is a transient, collective deviation in the noise terms.
+2. **Removing common structure:** A rolling PCA strips out dominant market factors, leaving residual returns.
+3. **Smoothing:** Residuals are exponentially smoothed to reduce microstructure noise.
+4. **Anomaly detection:** The CAPA algorithm flags segments where multiple smoothed residuals move together unexpectedly.
+5. **Trading logic:**  
+   - *TradeLogic1* seeks reconvergence after sudden negative correlations between correlated stocks.  
+   - *TradeLogic2* bets on mean reversion when principal-component trends break out.
+6. **Backtesting:** A simplified engine simulates latency and slippage to test strategies (bid–ask spread is not modeled).
+
+## Repository Structure
+
+- **alg_tools/**
+  - `smoother.py` – exponential smoothing routine.
+  - `capacc_wrapper.py` – Python wrapper for the R implementation of CAPA.
+- **algorithms/**
+  - `TradeLogic1.py` – anomaly-based statistical arbitrage on correlated names.
+  - `TradeLogic2.py` – mean-reversion on principal-component trends.
+- **backtesting/**
+  - `backtester.py` – orchestrates simulations with latency and slippage.
+  - `parameter_optimiser.py` – Bayesian optimization of strategy parameters.
+  - `example_backtest.ipynb` – notebook demonstrating end-to-end usage.
+
+## Getting Started
+
+1. Supply historical price data as a pandas DataFrame (datetime index, ticker columns).
+2. Instantiate `TradingLogic` with the desired parameters and feed data incrementally.
+3. Use `backtester.py` to run simulations; the notebook shows a typical workflow.
+
+## Caveats
+
+- Results are illustrative; no bid–ask spread is modeled, and the value traded is usualy very high relative to returns. Hence, it is likely the edge here is too small to be traded on. 
+
