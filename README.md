@@ -1,7 +1,7 @@
 # Financial Anomaly Detection
 
 This repository contains supplementary code and results for Section 4.2 of the dissertation **"Real-Time Anomaly Detection in Multidimensional Financial Time Series"** supervised by Idris Eckley and Florian Pein.  
-The project investigates whether short-lived anomalies—brief periods when residual returns across multiple assets move together in unexpected ways—can be detected in real time and traded profitably.
+The project investigates whether short lived anomalies (defined in this context as brief periods when residual returns across multiple assets move together in unexpected ways) can be detected in real time and traded profitably.
 
 ## Goal
 
@@ -37,9 +37,7 @@ To define a practical notion of “anomaly” in financial time series, detect s
 2. Instantiate `TradingLogic` with the desired parameters and feed data incrementally.
 3. Use `backtester.py` to run simulations; the notebook shows a typical workflow.
 
-## Dependencies and Caveats
+## Caveats
 
-- Python packages: NumPy, pandas, scikit-learn, etc.
-- R installation (for CAPA) accessible via `capacc_wrapper.py`.
-- Results are illustrative; no bid–ask spread is modeled, and nothing here constitutes investment advice.
+- Results are illustrative; no bid–ask spread is modeled, and the value traded is usualy very high relative to returns. Hence, it is likely the edge here is too small to be traded on. 
 
