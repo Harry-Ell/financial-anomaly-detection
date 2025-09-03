@@ -152,7 +152,7 @@ class TradingLogic:
                         .fillna(0.0))[self.tickers]
 
         # orders placed at t fill at t+1+slippage
-        executed = orders#.shift(1 + max(0, self.slippage)).fillna(0.0)
+        executed = orders.shift(1 + max(0, self.slippage)).fillna(0.0)
 
         # Only count fills up to "now"
         now = idx[-1]
