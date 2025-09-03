@@ -39,45 +39,66 @@ class TradingLogic:
         self.pca_resids_values = None
         self.smoothed_values = None
 
-
     def notify_new_point(self, new_row: pd.DataFrame):
         """
-        Append new data point, update PCA residuals & smoothed series.
+        Append a new observation and update PCA residuals and smoothed series.
+        Keeps both NumPy arrays and DataFrame views in sync so downstream logic
+        uses fresh data.
         """
-        # ensure column order matches
+        # Ensure columns are in the expected order
         new_row = new_row.reindex(columns=self.tickers)
 
-        # update dataset (numpy storage)
+        # Append to NumPy storage
         self.dataset_values = np.vstack([self.dataset_values, new_row.to_numpy()])
         self.dataset_index.append(new_row.index[0])
 
-        # compute last return
+        # Refresh DataFrame view of raw prices
+        self.dataset = pd.DataFrame(
+            self.dataset_values,
+            index=self.dataset_index,
+            columns=self.tickers,
+        )
+
+        # Need at least two points and a trained PCA model
         if len(self.dataset_index) < 2 or self.pca is None:
             return
 
-        last_prices = pd.DataFrame(self.dataset_values[-10:], 
-                                   index=self.dataset_index[-10:], 
-                                   columns=self.tickers)
+        # Compute the latest return
+        last_prices = self.dataset.iloc[-10:]
         returns_new = self._returns_from_prices(last_prices).iloc[[-1]]
         if returns_new.isna().any(axis=None):
             return
 
-        # residual
+        # Remove top k PCs to get residual
         resid_df = self._remove_top_k_pcs(returns_new, self.pca)
         resid_row = resid_df.to_numpy()[0]
 
+        # Store residuals in NumPy + DataFrame form
         if self.pca_resids_values is None:
             self.pca_resids_values = resid_row[None, :]
         else:
             self.pca_resids_values = np.vstack([self.pca_resids_values, resid_row])
+        self.pca_resids = pd.DataFrame(
+            self.pca_resids_values,
+            index=self.dataset_index[-len(self.pca_resids_values):],
+            columns=self.tickers,
+        )
 
-        # smoothing
+        # Exponential smoothing of residuals
         if self.smoothed_values is None:
             self.smoothed_values = resid_row[None, :]
         else:
             s_prev = self.smoothed_values[-1]
             s_new = self.alpha * resid_row + (1 - self.alpha) * s_prev
             self.smoothed_values = np.vstack([self.smoothed_values, s_new])
+
+        # Refresh DataFrame view of smoothed series
+        self.smoothed_series = pd.DataFrame(
+            self.smoothed_values,
+            index=self.dataset_index[-len(self.smoothed_values):],
+            columns=self.tickers,
+        )
+
 
     # HELPER FUNCTIONS
     def _returns_from_prices(self, df_prices: pd.DataFrame) -> pd.DataFrame:
@@ -173,7 +194,7 @@ class TradingLogic:
         if self.smoothed_series is None or len(self.smoothed_series) == 0:
             return {}
         # to speed up, this is going to be ran only every n data points
-        if len(self.smoothed_series) % self.backtest_res == 0:
+        if len(self.smoothed_series) % self.backtest_res == 0 and len(self.smoothed_series) > self.min_anom:
             # --- anomaly detection window ---
             df = self.smoothed_series.iloc[-50:]
             X = df.to_numpy()
@@ -208,8 +229,7 @@ class TradingLogic:
                     # cancel any existing unwind plan; we’re actively trading this name
                     if tkr in self.unwind_plan:
                         del self.unwind_plan[tkr]
-            # For names without anomaly but with inventory, we leave them unchanged *this bar*.
-            # (You can also choose to keep unwinding unaffected names—up to you.)
+            # For names without anomaly but with inventory, we leave them unchanged 
             return signals.to_dict()
 
        # 2) No anomalies now: linearly unwind to flat over unwind_bars bars

@@ -22,19 +22,18 @@ def monotonicity_score(pnl_series):
     Mixes objective of sharpe and also cagr / max drawdown 
     '''
     # # normalise by scale of pnl
-    pnl = pnl_series.values
-    # returns = pd.Series(pnl).diff().dropna()
-    
-    # sharpe = returns.mean() / (returns.std() + 1e-9)
-    # max_dd = (np.maximum.accumulate(pnl) - pnl).max()
-    # calmar = (pnl[-1] - pnl[0]) / (max_dd + 1e-9)
+    pnl = pnl_series.values[::300]
 
-    # # equal weighted combination
-    # score = sharpe 
-    # print(f'Another run completed, with sharpe = {sharpe}, calmar = {calmar}')
+    returns = pd.Series(pnl).diff().dropna()
+    sharpe = returns.mean() / (returns.std() + 1e-9)
+    max_dd = (np.maximum.accumulate(pnl) - pnl).max()
+    calmar = (pnl[-1] - pnl[0]) / (max_dd + 1e-9)
 
-    # return score
-    return pnl[-1]
+    # equal weighted combination
+    score = sharpe 
+    print(f'Another run completed, with sharpe = {sharpe * np.sqrt(252)}, calmar = {calmar}')
+
+    return score
 
 
 def run_backtest(alpha, pcs_removed, slippage, unwind_rate, sensitivity, min_len):
@@ -43,7 +42,7 @@ def run_backtest(alpha, pcs_removed, slippage, unwind_rate, sensitivity, min_len
     '''
     outs = Orchestrator(
         TradingLogic1,
-        start_time="2025-08-05 14:30:00+00:00",
+        start_time="2025-08-22 14:30:00+00:00",
         dataset=dataset,
         alpha=alpha,
         pcs_removed=int(pcs_removed),
@@ -51,6 +50,7 @@ def run_backtest(alpha, pcs_removed, slippage, unwind_rate, sensitivity, min_len
         unwind_rate=unwind_rate,
         sensitivity=sensitivity,
         min_len=int(min_len),
+        bt_res=3
     ).RunOrchestrator()
     
     pnl_curve = outs[1]
@@ -61,8 +61,8 @@ if __name__ == "__main__":
     space = [
         Real(0.4, 0.8, name='alpha'),
         Integer(2, 3, name='pcs_removed'),
-        Real(1, 10, name='slippage'),
-        Real(1, 20, name='unwind_rate'),
+        Integer(1, 10, name='slippage'),
+        Integer(1, 20, name='unwind_rate'),
         Real(0.001, 0.05, name='sensitivity'),
         Integer(5, 50, name='min_len'),
     ]
