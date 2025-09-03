@@ -38,6 +38,7 @@ To define a practical notion of “anomaly” in financial time series, detect s
 1. Supply historical price data as a pandas DataFrame (datetime index, ticker columns).
 2. Instantiate `TradingLogic` with the desired parameters and feed data incrementally.
 3. Use `backtester.py` to run simulations; the notebook shows a typical workflow.
+Note, paths to R on your local machine must be altered inside of capacc_wrapper.py. 
 
 ## Caveats
 
