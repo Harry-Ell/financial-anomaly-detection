@@ -25,7 +25,8 @@ class Orchestrator:
                  slippage = 1, 
                  unwind_rate=10, 
                  sensitivity = 0.01,
-                 min_len = 10):
+                 min_len = 10, 
+                 bt_res = 1):
         
         self.start_time = pd.to_datetime(start_time)
         self.alpha = float(alpha)
@@ -45,6 +46,7 @@ class Orchestrator:
 
         self.sensitivity = sensitivity
         self.min_anom = int(min_len)
+        self.bt_res = bt_res
 
     # setup 
     def first_pull(self):
@@ -72,7 +74,8 @@ class Orchestrator:
                                 unwind_bars=self.unwind,
                                 slippage=self.slippage, 
                                 sensitivity = self.sensitivity, 
-                                min_len = self.min_anom)
+                                min_len = self.min_anom, 
+                                bt_res = self.bt_res)
         # full fit on seed data
         self.bot.retrain_full(self.data)
 

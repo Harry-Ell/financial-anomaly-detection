@@ -10,47 +10,74 @@ Trade on these, bet on reconvergence after periods of negative correlation.
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
-# import sys 
-# sys.path.append('..')
-from alg_tools.smoother import exp_smoother
 
-# wrapper function which is written initially in r 
+from alg_tools.smoother import exp_smoother
 from alg_tools.capacc_wrapper import capa_cc
 
 class TradingLogic:
     def __init__(self, 
-                 dataset,          # all the data that the model is told about at once
-                 start_time,       # this is basically our time index, we need this to make trades log
-                 pcs_removed,      # integer, how much structure do we want to take from the series. 
-                 alpha,            # used by our smoother 
-                 slippage, 
-                 unwind_bars = 10, 
-                 sensitivity = 0.01,
-                 min_len = 10, 
-                 pca_lookback=300):
-        
-        # general setup/ data params
-        self.dataset = dataset.copy()
-        self.start_time = start_time
+                 dataset, start_time, pcs_removed, alpha, slippage,
+                 unwind_bars=10, sensitivity=0.01, min_len=10, pca_lookback=300, bt_res = 1):
         self.tickers = list(dataset.columns)
-        self.smoothed_series = None
-
-        # exit/ execution params
+        self.start_time = start_time
         self.slippage = int(slippage)
         self.unwind_bars = int(unwind_bars)
-        self.unwind_plan = { }  
-        
-        # pca related
-        self.pca = None
-        self.pca_resids = None
-        self.pca_lookback = pca_lookback
-
-        # STRAT PARAMS 
+        self.unwind_plan = {}
         self.alpha = float(alpha)
         self.sensitivity = sensitivity
         self.min_anom = int(min_len)
         self.k = int(pcs_removed)
-        self.alpha = float(alpha)
+        self.pca_lookback = pca_lookback
+        self.backtest_res = bt_res
+
+        # store raw data as numpy
+        self.dataset_values = dataset.to_numpy(copy=True)
+        self.dataset_index = list(dataset.index)
+
+        # placeholders
+        self.pca = None
+        self.pca_resids_values = None
+        self.smoothed_values = None
+
+
+    def notify_new_point(self, new_row: pd.DataFrame):
+        """
+        Append new data point, update PCA residuals & smoothed series.
+        """
+        # ensure column order matches
+        new_row = new_row.reindex(columns=self.tickers)
+
+        # update dataset (numpy storage)
+        self.dataset_values = np.vstack([self.dataset_values, new_row.to_numpy()])
+        self.dataset_index.append(new_row.index[0])
+
+        # compute last return
+        if len(self.dataset_index) < 2 or self.pca is None:
+            return
+
+        last_prices = pd.DataFrame(self.dataset_values[-10:], 
+                                   index=self.dataset_index[-10:], 
+                                   columns=self.tickers)
+        returns_new = self._returns_from_prices(last_prices).iloc[[-1]]
+        if returns_new.isna().any(axis=None):
+            return
+
+        # residual
+        resid_df = self._remove_top_k_pcs(returns_new, self.pca)
+        resid_row = resid_df.to_numpy()[0]
+
+        if self.pca_resids_values is None:
+            self.pca_resids_values = resid_row[None, :]
+        else:
+            self.pca_resids_values = np.vstack([self.pca_resids_values, resid_row])
+
+        # smoothing
+        if self.smoothed_values is None:
+            self.smoothed_values = resid_row[None, :]
+        else:
+            s_prev = self.smoothed_values[-1]
+            s_new = self.alpha * resid_row + (1 - self.alpha) * s_prev
+            self.smoothed_values = np.vstack([self.smoothed_values, s_new])
 
     # HELPER FUNCTIONS
     def _returns_from_prices(self, df_prices: pd.DataFrame) -> pd.DataFrame:
@@ -106,35 +133,13 @@ class TradingLogic:
         self.smoothed_series = smoothed_new
 
 
-    def notify_new_point(self, new_row: pd.DataFrame):
-        '''
-        Use current pca to fit a new point. given a new row, massage it on to the df, and find its returns
-        '''
-        new_row = new_row.reindex(columns=self.tickers)
-        self.dataset = pd.concat([self.dataset, new_row])
-        returns_new = self._returns_from_prices(self.dataset[-10:]).iloc[[-1]]
-
-        # the only role of this is to get rid of the pylance hints 
-        if self.pca is None or returns_new.isna().any(axis=None):
-            return  # nothing to do yet
-
-        # remove the pcs and add to the df we already have to store these 
-        resid_df = self._remove_top_k_pcs(returns_new, self.pca)
-        self.pca_resids = pd.concat([self.pca_resids, resid_df])
-
-        # incremental smoothing update, if else is again to get rid of the type hint
-        if self.smoothed_series is None or len(self.smoothed_series) == 0:
-            self.smoothed_series = resid_df.copy()
-        else:
-            s_prev = self.smoothed_series.iloc[-1]
-            s_new = self.alpha * resid_df.iloc[0] + (1 - self.alpha) * s_prev
-            self.smoothed_series = pd.concat([self.smoothed_series, s_new.to_frame().T])
-
 
     def _executed_inventory(self, trade_log: list[dict]) -> pd.Series:
         '''
         this is to help us unwind trades like we planned on doing. 
+
         '''
+        # if we do not have any trades made yet, just say 0
         if not trade_log:
             return pd.Series(0.0, index=self.tickers)
 
@@ -146,13 +151,14 @@ class TradingLogic:
         orders = (orders.reindex(idx)
                         .fillna(0.0))[self.tickers]
 
-        # Execution: orders placed at t fill at t+1+slippage
-        executed = orders.shift(1 + max(0, self.slippage)).fillna(0.0)
+        # orders placed at t fill at t+1+slippage
+        executed = orders#.shift(1 + max(0, self.slippage)).fillna(0.0)
 
         # Only count fills up to "now"
         now = idx[-1]
         executed = executed.loc[:now]
 
+        # sum over all the orders until now 
         pos = executed.cumsum().iloc[-1]
         pos = pos.reindex(self.tickers).fillna(0.0)
         return pos
@@ -166,19 +172,22 @@ class TradingLogic:
         """
         if self.smoothed_series is None or len(self.smoothed_series) == 0:
             return {}
+        # to speed up, this is going to be ran only every n data points
+        if len(self.smoothed_series) % self.backtest_res == 0:
+            # --- anomaly detection window ---
+            df = self.smoothed_series.iloc[-50:]
+            X = df.to_numpy()
+            denom = np.max(np.abs(X)) if np.max(np.abs(X)) != 0 else 1.0
+            rescaled = X / denom
 
-        # --- anomaly detection window ---
-        df = self.smoothed_series.iloc[-50:]
-        X = df.to_numpy()
-        denom = np.max(np.abs(X)) if np.max(np.abs(X)) != 0 else 1.0
-        rescaled = X / denom
+            # old cov mat 
+            Q = np.eye(len(self.tickers))
 
-        # old cov mat 
-        Q = np.eye(len(self.tickers))
-
-        # ROUTINE TO CALL CAPA CC
-        anoms_exp = capa_cc(rescaled, Q, b=self.sensitivity, b_point=10, min_seg_len=self.min_anom)
-        relevant = anoms_exp.loc[anoms_exp["end"] >= (len(df) - 1)] if len(anoms_exp) else anoms_exp
+            # ROUTINE TO CALL CAPA CC
+            anoms_exp = capa_cc(rescaled, Q, b=self.sensitivity, b_point=10, min_seg_len=self.min_anom)
+            relevant = anoms_exp.loc[anoms_exp["end"] >= (len(df) - 1)] if len(anoms_exp) else anoms_exp
+        else:
+            relevant = pd.DataFrame()
         signals = pd.Series(0.0, index=self.tickers)
 
         # Current executed inventory (accounts for slippage)
@@ -188,7 +197,6 @@ class TradingLogic:
             # print(relevant, flush = True)
             # 1) Trade the anomalies; cancel unwind plan on affected tickers
             for idx, row in relevant.iterrows():
-                # 'variate' indexing in capa is often 1-based; keep your -1 but guard bounds
                 j = int(row["variate"]) - 1
                 if 0 <= j < len(self.tickers):
                     tkr = self.tickers[j]
@@ -204,29 +212,33 @@ class TradingLogic:
             # (You can also choose to keep unwinding unaffected names—up to you.)
             return signals.to_dict()
 
-        # 2) No anomalies now: linearly unwind to flat over unwind_bars bars
+       # 2) No anomalies now: linearly unwind to flat over unwind_bars bars
         N = max(1, self.unwind_bars)
         for tkr in self.tickers:
-            q = inv.get(tkr, 0.0)
+            inv_pos = inv.get(tkr, 0.0)
 
-            if abs(q) < 1e-12:
-                # flat -> no plan needed
-                if tkr in self.unwind_plan:
-                    del self.unwind_plan[tkr]
+            # If already flat, clear plan
+            if abs(inv_pos) < 1e-12:
+                self.unwind_plan.pop(tkr, None)
                 continue
 
+            # Use existing plan if it exists
             plan = self.unwind_plan.get(tkr)
             if plan is None:
-                # Start a new linear plan: equal chunks that sum exactly to -q
-                chunk = -q / N          # negative if q>0 (sell), positive if q<0 (buy)
-                self.unwind_plan[tkr] = {"chunk": float(chunk), "left": N}
-                plan = self.unwind_plan[tkr]
+                # Create a plan once, based on current inventory
+                chunk = -inv_pos / N
+                plan = {"chunk": float(chunk), "left": N}
+                self.unwind_plan[tkr] = plan
 
-            # Emit one equal chunk per bar
+            # Follow the existing plan exactly
             signals[tkr] = plan["chunk"]
             plan["left"] -= 1
+
             if plan["left"] <= 0:
-                del self.unwind_plan[tkr]
+                # Force to zero at the end (avoid residuals)
+                signals[tkr] = -inv_pos
+                self.unwind_plan.pop(tkr, None)
+
 
         return signals.to_dict()
 
