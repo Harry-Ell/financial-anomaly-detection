@@ -81,7 +81,7 @@ class Orchestrator:
         self.bot.retrain_full(self.data)
 
     # walk forward block 
-    def RetrainingCycle(self):
+    def retraining_cycle(self):
         '''
         pick up the next 15 points out of the time series, store in block times
         '''
@@ -107,10 +107,10 @@ class Orchestrator:
             # get the new row of prices, append to working data
             new_row = self.dataset_full.loc[[ts]]# type: ignore
             self.data = pd.concat([self.data, new_row])
-            self.bot.notify_new_point(new_row) # notify the new bot # type: ignore , 
+            self.bot.notify_new_point(new_row) # notify the new bot # type: ignore ,
 
             # get signals and log
-            signals = self.bot.RunStrategy(self.trades_log) or {}# type: ignore
+            signals = self.bot.run_strategy(self.trades_log) or {}# type: ignore
             self.trades_log.append({"time": ts, **signals})
 
             # quick step forward for overnight trading logic 
@@ -163,7 +163,7 @@ class Orchestrator:
         return equity
 
     # Point of entry to class
-    def RunOrchestrator(self):
+    def run_orchestrator(self):
         '''
         walk forward through the entire time series at once
         '''
@@ -172,7 +172,7 @@ class Orchestrator:
             self.first_pull()
 
         # loop until we run out of data
-        while self.RetrainingCycle():
+        while self.retraining_cycle():
             pass
 
         # if no trades are made, return an empty df 
