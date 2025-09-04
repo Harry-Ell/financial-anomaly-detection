@@ -27,7 +27,7 @@ To define a practical notion of “anomaly” in financial time series, detect s
   - `capacc_wrapper.py` - Python wrapper for the R implementation of CAPA.
 - **algorithms/**
   - `base.py` - base class from which subsequent algorithm will inherit.
-  - `TradingStrategy.py` - mean-reversion on principal-component trends. 
+  - `trading_strategy.py` - mean-reversion on principal-component trends. 
 - **backtesting/**
   - `backtester.py` - orchestrates simulations with latency and slippage.
   - `example_backtest.ipynb` - notebook demonstrating end-to-end usage.

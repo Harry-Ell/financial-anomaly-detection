@@ -56,7 +56,7 @@ class TradingAlgorithm(ABC):
 ###################################################################
 
     @abstractmethod
-    def TradingStrategy(self, trade_log):
+    def trading_strategy(self, trade_log):
         '''
         Core logic function in which anomalies are detected and potentially 
         acted on 
@@ -263,5 +263,5 @@ class TradingAlgorithm(ABC):
         self.smoothed_series = smoothed_new
 
     def run_strategy(self, trade_log):
-        self.TradingStrategy(trade_log)
+        self.trading_strategy(trade_log)
         return self.signals

@@ -2,3 +2,4 @@
 *__pycache__
 *env
 dev_steps
+*.out

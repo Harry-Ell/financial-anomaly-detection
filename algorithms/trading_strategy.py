@@ -12,7 +12,7 @@ from alg_tools.capacc_wrapper import capa_cc
 
 class TradingLogic(TradingAlgorithm):
 
-    def TradingStrategy(self, trade_log):
+    def trading_strategy(self, trade_log):
         '''
         - If recent anomalies: place buy orders proportional to anomaly size
           cancel any existing unwind plan for affected tickers.
@@ -70,3 +70,4 @@ class TradingLogic(TradingAlgorithm):
         signals = pd.Series(0.0, index=self.tickers)
         inv = self._executed_inventory(trade_log)
         return relevant, signals, inv
+    

@@ -15,7 +15,7 @@ from skopt.space import Real, Integer # type: ignore
 
 # backtest engine and strategies
 from backtesting.backtester import Orchestrator
-from algorithms.TradingStrategy import TradingLogic
+from algorithms.trading_strategy import TradingLogic
 
 # load data, filter down to most correlated stocks only.
 dataset = pd.read_csv('data/qtm_data.csv', index_col = 'Datetime')
@@ -90,4 +90,3 @@ if __name__ == "__main__":
     print('Market Neutral strat:')
     print("Best score:", -res.fun)
     print("Best params:", res.x)
-

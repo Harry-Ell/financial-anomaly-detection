@@ -12,7 +12,7 @@ import pandas as pd
 
 # my packages + data
 from backtesting.backtester import Orchestrator
-from algorithms.TradingStrategy import TradingLogic
+from algorithms.trading_strategy import TradingLogic
 dataset = pd.read_csv('data/qtm_data.csv', index_col = 'Datetime')
 
 # filter this to only include the most correlated stocks 
