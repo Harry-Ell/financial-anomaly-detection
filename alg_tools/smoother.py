@@ -1,14 +1,13 @@
 '''
 Simple exponential smoother
-
-as in a lot of other files, perhaps we do need an incremental version also? 
 '''
 
 import numpy as np 
 
 def exp_smoother(time_series, alpha):
     '''
-    function for doing full time series worth of smoothing
+    function for doing full time series worth of smoothing, expects pandas series 
+    as input
     '''
     smoothed_series = np.zeros_like(time_series, dtype = float)
     for idx, value in enumerate(time_series):

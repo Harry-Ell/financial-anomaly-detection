@@ -1,14 +1,10 @@
 '''
-Backtesting engine for hyperparameter tuning etc 
+Backtesting engine for strategies which deal with trading on correlated stocks. 
 
 Returns logs of trades, orders over time, and pnl. 
 '''
 
 import pandas as pd
-from pathlib import Path
-
-# import sys 
-# sys.path.append('..')
 
 class Orchestrator:
     '''
@@ -18,6 +14,7 @@ class Orchestrator:
                  TradingLogic,
                  start_time,
                  alpha, 
+                 remove_pcs = True,
                  pcs_removed=2, 
                  block_size=15,
                  dataset=pd.DataFrame(),
@@ -28,27 +25,32 @@ class Orchestrator:
                  min_len = 10, 
                  bt_res = 1):
         
+        # BOOK KEEPING PARAMETERS
         self.start_time = pd.to_datetime(start_time)
+        self.dataset_full = dataset  # full prices
+        self.data = None             # working prices up to cursor
+
+        # PREPROCESSING PARAMETERS
         self.alpha = float(alpha)
+        self.remove_pcs = remove_pcs
         self.k = int(pcs_removed)
         self.block_size = int(block_size)
         self.gap_reset = pd.Timedelta(minutes=gap_reset_minutes)
-
-        self.dataset_full = dataset  # full prices
-        self.data = None             # working prices up to cursor
-        self.cursor_time = None      # point up to which we are looking 
-        self.bot = None              # TradingLogic instance
-        self.trades_log = []         # list of dicts
-        self.trading_bot = TradingLogic
-
+        
+        # TRADING STRATEDY PARAMETERS
         self.slippage = slippage
         self.unwind = unwind_rate
-
+        self.trades_log = []         # list of dicts
         self.sensitivity = sensitivity
         self.min_anom = int(min_len)
+
+        # BACKTEST PARAMETERS
+        self.cursor_time = None      # point up to which we are looking 
+        self.bot = None              # TradingLogic instance
+        self.trading_bot = TradingLogic
         self.bt_res = bt_res
 
-    # setup 
+    # setup backtest 
     def first_pull(self):
         '''
         Take the data which has been given, move the index to be a datetime. Then, 
@@ -56,8 +58,6 @@ class Orchestrator:
         '''
         self.dataset_full.index = pd.to_datetime(self.dataset_full.index)
         df = self.dataset_full
-        if len(df) == 0:
-            raise ValueError('Dataset must be passed to backtester')
 
         # rows strictly before start_time
         seed = df.loc[df.index < self.start_time]
@@ -69,7 +69,8 @@ class Orchestrator:
         # init bot with seed data
         self.bot = self.trading_bot(dataset=self.data,
                                 start_time=self.start_time,
-                                pcs_removed=self.k,
+                                remove_pcs = self.remove_pcs,
+                                pcs=self.k,
                                 alpha=self.alpha, 
                                 unwind_bars=self.unwind,
                                 slippage=self.slippage, 
@@ -121,46 +122,35 @@ class Orchestrator:
 
         return True
     
-    def compute_pnl(self):
+    def _compute_pnl(self):
         '''
         Price-units accounting (cash + inventory).
-        trades_log rows are ORDERS at decision time: Δq_t (shares, +/-) per name.
+        trades_log rows are orders at decision time, in units of number of shares
         Orders at t fill at t+1+slippage, executed at that bar's price.
 
         Returns:
-            total_pnl   : equity curve (cash + inventory value)
-            pnl_per_bar : per-bar change in equity
-            trading_pnl : same as total_pnl (kept for compatibility)
-            holding_pnl : final inventory mark (debugging aid)
+            total_pnl 
         '''
         
-        if self.dataset_full is None or len(self.trades_log) == 0:
-            empty = pd.Series(dtype=float)
-            return empty, empty, empty, empty
-
-        # Prices (assumed to be actual PRICES, not returns)
+        if len(self.trades_log) == 0:
+            return pd.Series(dtype=float)
+            
+        # Prices 
         prices = self.dataset_full.astype(float).sort_index()
 
         # Orders placed at decision times
-        orders_raw = (pd.DataFrame(self.trades_log)
-                        .set_index("time")
-                        .sort_index())
+        orders_raw = pd.DataFrame(self.trades_log).set_index("time").sort_index()
 
-        # Keep only tickers that exist in price table; align to all timestamps
+        # Keep only tickers that exist in price table and align
         tickers = [c for c in orders_raw.columns if c in prices.columns]
-        if not tickers:
-            empty = pd.Series(dtype=float)
-            return empty, empty, empty, empty
-
         prices = prices[tickers]
-        orders = orders_raw[tickers].reindex(prices.index).fillna(0)  # NO forward-fill 
+        orders = orders_raw[tickers].reindex(prices.index).fillna(0)  
 
-        # --- Execution latency ---
-        # Positions decided at t start being held from t+1+delay; trades execute then.
-        delay = max(0, int(self.slippage))
-        executed = orders.shift(1 + delay).reindex(prices.index).fillna(0)
+        # Simulate execution latency here 
+        slip = max(0, int(self.slippage))
+        executed = orders.shift(1 + slip).reindex(prices.index).fillna(0)
 
-        # --- Build positions and cash from executed trades ---
+        # Find out overall positions vs time
         positions = executed.cumsum()
         # Cash flow: buys reduce cash, sells increase cash
         cash_flows = -(executed * prices).sum(axis=1)        # value at EXECUTION bar price
@@ -170,14 +160,9 @@ class Orchestrator:
         inv_value = (positions * prices).sum(axis=1)
         equity = cash + inv_value
 
-        total_pnl = equity
-        pnl_per_bar = equity.diff().fillna(equity.iloc[0])
-        trading_pnl = equity
-        holding_pnl = pd.Series((positions.iloc[-1] * prices.iloc[-1]).sum(),
-                                index=[prices.index[-1]])
-        return total_pnl, pnl_per_bar, trading_pnl, holding_pnl
+        return equity
 
-    # --------- Runner ---------
+    # Point of entry to class
     def RunOrchestrator(self):
         '''
         walk forward through the entire time series at once
@@ -196,8 +181,6 @@ class Orchestrator:
 
         # else make them into a data frame. 
         log_df = pd.DataFrame(self.trades_log).set_index("time").sort_index()
-        total_pnl, pnl_per_bar, trading_pnl, holding_pnl = self.compute_pnl()
-        # print(pnl)
-        # print(log_df)
-        return log_df, total_pnl, pnl_per_bar, trading_pnl, holding_pnl
+        total_pnl = self._compute_pnl()
 
+        return log_df, total_pnl
