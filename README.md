@@ -39,7 +39,21 @@ To define a practical notion of “anomaly” in financial time series, detect s
 1. Supply historical price data as a pandas DataFrame (datetime index, ticker columns).
 2. Instantiate `TradingLogic` with the desired parameters and feed data incrementally.
 3. Use `backtester.py` to run simulations; the notebook shows a typical workflow.
-Note, paths to R on your local machine must be altered inside of capacc_wrapper.py. 
+
+### R configuration
+
+The CAPA wrapper relies on an R installation. Provide its location by
+setting the ``R_HOME`` environment variable or by creating a
+configuration file ``alg_tools/r_config.ini`` with the following
+contents:
+
+```
+[R]
+home=/path/to/R
+```
+
+The wrapper will add the appropriate ``bin`` (and ``x64`` on Windows)
+subdirectory to ``PATH``.
 
 ## Caveats
 

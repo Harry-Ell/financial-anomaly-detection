@@ -9,11 +9,9 @@ import cProfile
 import pstats
 
 import pandas as pd 
-import os, sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # my packages + data
-from backtester import Orchestrator
+from backtesting.backtester import Orchestrator
 from algorithms.TradingStrategy import TradingLogic
 dataset = pd.read_csv('data/qtm_data.csv', index_col = 'Datetime')
 

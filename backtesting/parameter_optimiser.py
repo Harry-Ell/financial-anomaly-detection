@@ -8,15 +8,13 @@ the objective here.
 Dataset is also partitioned to give us some out of sample data cross validate with. 
 '''
 
-import os, sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import pandas as pd 
 import numpy as np 
 from skopt import gp_minimize # type: ignore
 from skopt.space import Real, Integer # type: ignore
 
 # backtest engine and strategies
-from backtester import Orchestrator
+from backtesting.backtester import Orchestrator
 from algorithms.TradingStrategy import TradingLogic
 
 # load data, filter down to most correlated stocks only.
