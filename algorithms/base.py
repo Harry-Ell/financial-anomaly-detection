@@ -201,7 +201,7 @@ class TradingAlgorithm(ABC):
             return
 
         # Compute the latest return
-        last_prices = self.dataset.iloc[-10:]
+        last_prices = self.dataset.iloc[-2:]
         returns_new = self._returns_from_prices(last_prices).iloc[[-1]]
         if returns_new.isna().any(axis=None):
             return
