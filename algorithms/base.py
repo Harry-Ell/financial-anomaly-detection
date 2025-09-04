@@ -262,6 +262,6 @@ class TradingAlgorithm(ABC):
         self.pca_resids = resids_new
         self.smoothed_series = smoothed_new
 
-    def RunStrategy(self,trade_log):
+    def run_strategy(self, trade_log):
         self.TradingStrategy(trade_log)
         return self.signals

@@ -60,7 +60,7 @@ def run_backtest(alpha, pcs_removed, unwind_rate, sensitivity, min_len):
         sensitivity=sensitivity,
         min_len=int(min_len),
         bt_res=3
-    ).RunOrchestrator()
+    ).run_orchestrator()
     
     # extracting information regarding backtest
     pnl_curve = outs[1]
@@ -92,3 +92,4 @@ if __name__ == "__main__":
     print('Market Neutral strat:')
     print("Best score:", -res.fun)
     print("Best params:", res.x)
+

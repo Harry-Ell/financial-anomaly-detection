@@ -33,7 +33,7 @@ def run():
         sensitivity=0.02, 
         min_len=9, 
         bt_res = 1
-        ).RunOrchestrator() 
+        ).run_orchestrator()
     
 # run within profiler
 cProfile.run("run()", "profile.out")
