@@ -14,24 +14,25 @@ To define a practical notion of “anomaly” in financial time series, detect s
 3. **Smoothing:** Residuals are exponentially smoothed to reduce microstructure noise.
 4. **Anomaly detection:** The CAPA algorithm flags segments where multiple smoothed residuals move together unexpectedly.
 5. **Trading logic:**  
-   - *TradeLogic1* seeks reconvergence after sudden negative correlations between correlated stocks.  
-   - *TradeLogic2* bets on mean reversion when principal-component trends break out.
+   - *Algorithm 1* bets on mean reversion when principal-component trends break out.
+   - *Algorithm 2* seeks reconvergence after sudden negative correlations between correlated stocks.  
 6. **Backtesting:** A simplified engine simulates latency and slippage to test strategies (bid–ask spread is not modelled). A plot of absolute returns vs time can be seen below. Total invested capital is always less than $400, on this particular run. 
 
-![CLI](abs_returns_vs_time.png)
+![fig](mean_rev_strat.png)
 
 ## Repository Structure
 
 - **alg_tools/**
-  - `smoother.py` – exponential smoothing routine.
-  - `capacc_wrapper.py` – Python wrapper for the R implementation of CAPA.
+  - `smoother.py` - exponential smoothing routine.
+  - `capacc_wrapper.py` - Python wrapper for the R implementation of CAPA.
 - **algorithms/**
-  - `TradeLogic1.py` – anomaly-based statistical arbitrage on correlated names.
-  - `TradeLogic2.py` – mean-reversion on principal-component trends.
+  - `base.py` - base class from which subsequent algorithm will inherit.
+  - `TradingStrategy.py` - mean-reversion on principal-component trends. 
 - **backtesting/**
-  - `backtester.py` – orchestrates simulations with latency and slippage.
-  - `parameter_optimiser.py` – Bayesian optimization of strategy parameters.
-  - `example_backtest.ipynb` – notebook demonstrating end-to-end usage.
+  - `backtester.py` - orchestrates simulations with latency and slippage.
+  - `example_backtest.ipynb` - notebook demonstrating end-to-end usage.
+  - `parameter_optimiser.py` - Bayesian optimization of strategy parameters.
+  - `profiling.py` - usage of profiler to find bottlenecks.  
 
 ## Getting Started
 
@@ -42,5 +43,5 @@ Note, paths to R on your local machine must be altered inside of capacc_wrapper.
 
 ## Caveats
 
-- Results are illustrative; no bid–ask spread is modelled, and the value traded is usually very high relative to returns. Hence, the edge which is acquired from this stratedy is inaccessible, due to being hidden by bid ask spreads. This is particularly true in the case of the Quantum Computing stocks, which are realtively illiquid when compared to other highly correlated stocks, such as US banking stocks.  
+- Results are illustrative; no bid-ask spread is modelled, and the value traded is usually very high relative to returns. Hence, the edge which is acquired from this strategy is inaccessible, due to being hidden by bid ask spreads. This is particularly true in the case of the Quantum Computing stocks, which are realtively illiquid when compared to other highly correlated stocks, such as US banking stocks.  
 
